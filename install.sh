@@ -20,6 +20,7 @@ for CUR_DIR in /host${LOGDIR}/${NAME} /host${DATADIR}/${NAME} /host${CONFDIR}/${
 	if [ "$CUR_DIR" == "/host${CONFDIR}/${NAME}" ] ; then
 	    cp -Rv ${CONFDIR}/${NAME}.default/* /host${CONFDIR}/${NAME}/
 	elif [ "$CUR_DIR" == "/host${DATADIR}/${NAME}" ] ; then
+            mkdir /host${DATADIR}/${NAME}/www
 	    cp -Rv /var/www.default/* /host${DATADIR}/${NAME}/www
 	fi
         chmod 775 $CUR_DIR
