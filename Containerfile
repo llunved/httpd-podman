@@ -16,15 +16,15 @@ USER root
 RUN mkdir -p /httpd
 WORKDIR /httpd
 
-ADD ./rpmreqs-rt.txt ./rpmreqs-build.txt ./rpmreqs-dev.txt /httpd/
+ADD ./rpmreqs-build.txt /httpd/
 
 ENV http_proxy=$HTTP_PROXY
 RUN dnf -y install https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$OS_RELEASE.noarch.rpm \
     https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$OS_RELEASE.noarch.rpm \
     && dnf -y upgrade \
-    && dnf -y install $(cat rpmreqs-build.txt) \
-    && if [ ! -z "$DEVBUILD" ] ; then dnf -y install $(cat rpmreqs-dev.txt); fi 
+    && dnf -y install $(cat rpmreqs-build.txt) 
 
+ADD ./rpmreqs-rt.txt ./rpmreqs-dev.txt /httpd/
 # Create the minimal target environment
 RUN mkdir /sysimg \
     && dnf install --installroot /sysimg --releasever $OS_RELEASE --setopt install_weak_deps=false --nodocs -y coreutils-single glibc-minimal-langpack $(cat rpmreqs-rt.txt) \
@@ -39,7 +39,7 @@ RUN /usr/bin/systemctl --root /sysimg enable httpd
  
 # Move the httpd config, so we can mount it persistently from the host
 RUN mv -fv /sysimg/etc/httpd /sysimg/etc/httpd.default
-RUN mv -fv /sysimg/var/lib/httpd /sysimg/var/lib/httpd.default 
+RUN mv -fv /sysimg/var/www /sysimg/var/www.default
 
 FROM scratch AS runtime
 
@@ -49,9 +49,9 @@ WORKDIR /var/lib/httpd
 
 ENV USER=$USER
 ENV CHOWN=true 
-ENV CHOWN_DIRS="/var/lib/httpd /etc/httpd" 
+ENV CHOWN_DIRS="/var/www /etc/httpd" 
  
-VOLUME /etc/httpd /var/lib/httpd
+VOLUME /etc/httpd /var/www
 
 ADD ./install.sh \ 
     ./upgrade.sh \
@@ -66,7 +66,7 @@ EXPOSE 80 443
 CMD ["/sbin/init"]
 STOPSIGNAL SIGRTMIN+3
 
-LABEL RUN="podman run --rm -t -i --name ${NAME} --net=host -v /var/lib/${NAME}:/var/lib/${NAME}:rw,z -v etc/${NAME}:/etc/${NAME}:rw,z -v /var/log/${NAME}:/var/log/${NAME}:rw,z ${IMAGE}"
+LABEL RUN="podman run --rm -t -i --name ${NAME} --net=host -v /var/lib/${NAME}/www:/var/www:rw,z -v etc/${NAME}:/etc/${NAME}:rw,z -v /var/log/${NAME}:/var/log/${NAME}:rw,z ${IMAGE}"
 LABEL INSTALL="podman run --rm -t -i --privileged --rm --net=host --ipc=host --pid=host -v /:/host -v /run:/run -e HOST=/host -e IMAGE=\$IMAGE -e NAME=\$NAME -e CONFDIR=/etc -e LOGDIR=/var/log -e DATADIR=/var/lib --entrypoint /bin/sh  \$IMAGE /sbin/install.sh"
 LABEL UPGRADE="podman run --rm -t -i --privileged --rm --net=host --ipc=host --pid=host -v /:/host -v /run:/run -e HOST=/host -e IMAGE=\$IMAGE -e NAME=\$NAME -e CONFDIR=/etc -e LOGDIR=/var/log -e DATADIR=/var/lib --entrypoint /bin/sh  \$IMAGE /sbin/upgrade.sh"
 LABEL UNINSTALL="podman run --rm -t -i --privileged --rm --net=host --ipc=host --pid=host -v /:/host -v /run:/run -e HOST=/host -e IMAGE=\$IMAGE -e NAME=\$NAME -e CONFDIR=/etc -e LOGDIR=/var/log -e DATADIR=/var/lib --entrypoint /bin/sh  \$IMAGE /sbin/uninstall.sh"

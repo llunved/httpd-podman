@@ -1,2 +1,8 @@
 vi
 less
+procps-ng
+nmap-ncat
+net-tools
+nmap
+rpm
+microdnf
