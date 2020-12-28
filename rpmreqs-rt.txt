@@ -1,0 +1,15 @@
+tzdata
+httpd
+httpd-filesystem
+httpd-tools
+mod_fcgid.aarch64
+mod_auth_gssapi
+mod_authnz_external
+mod_ssl
+mod_selinux
+mod_security
+mod_http2 
+mod_ldap
+mod_security_crs 
+mod_xsendfile 
+mod_evasive
