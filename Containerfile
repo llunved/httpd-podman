@@ -7,10 +7,13 @@ ARG OS_RELEASE
 ARG OS_IMAGE
 ARG HTTP_PROXY=""
 ARG USER="httpd"
+ARG VOLUMES_ARG="/etc/httpd /var/www /usr/share/httpd /var/log/httpd"
 
 LABEL MAINTAINER riek@llunved.net
 
 ENV LANG=C.UTF-8
+ENV VOLUMES=$VOLUMES_ARG
+
 USER root
 
 RUN mkdir -p /httpd
@@ -38,11 +41,25 @@ RUN ln -s /sysimg/usr/share/zoneinfo/America/New_York /sysimg/etc/localtime
 RUN systemctl --root /sysimg mask systemd-remount-fs.service dev-hugepages.mount sys-fs-fuse-connections.mount systemd-logind.service getty.target console-getty.service && systemctl --root /sysimg disable dnf-makecache.timer dnf-makecache.service
 RUN /usr/bin/systemctl --root /sysimg enable httpd
  
-# Move the httpd config, so we can mount it persistently from the host
-RUN mv -fv /sysimg/etc/httpd /sysimg/etc/httpd.default
-RUN mv -fv /sysimg/var/www /sysimg/var/www.default
+# Move the httpd config to a deoc dir, so we can mount config from the host but export the defaults from the host
+RUN if [ -d /sysimg/usr/share/doc/httpd ]; then \
+       mv /sysimg/usr/share/doc/httpd /sysimg/usr/share/doc/httpd.default ; \
+    else \
+       mkdir -p /sysimg/usr/share/doc/httpd.default ; \
+    fi ; \
+    mkdir /sysimg/usr/share/doc/httpd.default/config
+
+RUN for CURF in ${VOLUMES} ; do \
+    if [ "$(ls -A /sysimg${CURF})" ]; then \
+        mkdir -pv /sysimg/usr/share/doc/httpd.default/config${CURF} ; \
+        mv -fv /sysimg${CURF}/* /sysimg/usr/share/doc/httpd.default/config${CURF}/ ;\
+    fi ; \
+    done
+
 
 FROM scratch AS runtime
+
+ARG VOLUMES_ARG="/etc/httpd /var/www /usr/share/httpd /var/log/httpd"
 
 COPY --from=build /sysimg /
 
@@ -52,23 +69,26 @@ ENV USER=$USER
 ENV CHOWN=true 
 ENV CHOWN_DIRS="/var/www /etc/httpd" 
  
-VOLUME /etc/httpd /var/www
+ENV VOLUMES=$VOLUMES_ARG
+VOLUME $VOLUMES
 
 ADD ./install.sh \ 
     ./upgrade.sh \
-    ./uninstall.sh /sbin
+    ./uninstall.sh \
+    ./init_container.sh /sbin
  
 RUN chmod +x /sbin/install.sh \
-    && chmod +x /sbin/upgrade.sh \
-    && chmod +x /sbin/uninstall.sh 
+             /sbin/upgrade.sh \
+             /sbin/uninstall.sh \
+             /sbin/init_container.sh
   
-# Using FPM
 EXPOSE 80 443
 CMD ["/usr/sbin/init"]
 STOPSIGNAL SIGRTMIN+3
 
-LABEL RUN="podman run --rm -t -i --name ${NAME} --net=host -v /var/lib/${NAME}/www:/var/www:rw,z -v etc/${NAME}:/etc/${NAME}:rw,z -v /var/log/${NAME}:/var/log/${NAME}:rw,z ${IMAGE}"
-LABEL INSTALL="podman run --rm -t -i --privileged --rm --net=host --ipc=host --pid=host -v /:/host -v /run:/run -e HOST=/host -e IMAGE=\$IMAGE -e NAME=\$NAME -e CONFDIR=/etc -e LOGDIR=/var/log -e DATADIR=/var/lib --entrypoint /bin/sh  \$IMAGE /sbin/install.sh"
-LABEL UPGRADE="podman run --rm -t -i --privileged --rm --net=host --ipc=host --pid=host -v /:/host -v /run:/run -e HOST=/host -e IMAGE=\$IMAGE -e NAME=\$NAME -e CONFDIR=/etc -e LOGDIR=/var/log -e DATADIR=/var/lib --entrypoint /bin/sh  \$IMAGE /sbin/upgrade.sh"
-LABEL UNINSTALL="podman run --rm -t -i --privileged --rm --net=host --ipc=host --pid=host -v /:/host -v /run:/run -e HOST=/host -e IMAGE=\$IMAGE -e NAME=\$NAME -e CONFDIR=/etc -e LOGDIR=/var/log -e DATADIR=/var/lib --entrypoint /bin/sh  \$IMAGE /sbin/uninstall.sh"
+#FIXME - BROKE THESE WITH THE MOVE TO PODS
+#LABEL RUN="podman run --rm -t -i --name ${NAME} --net=host -v /var/lib/${NAME}/www:/var/www:rw,z -v etc/${NAME}:/etc/${NAME}:rw,z -v /var/log/${NAME}:/var/log/${NAME}:rw,z ${IMAGE}"
+#LABEL INSTALL="podman run --rm -t -i --privileged --rm --net=host --ipc=host --pid=host -v /:/host -v /run:/run -e HOST=/host -e IMAGE=\$IMAGE -e NAME=\$NAME -e CONFDIR=/etc -e LOGDIR=/var/log -e DATADIR=/var/lib --entrypoint /bin/sh  \$IMAGE /sbin/install.sh"
+#LABEL UPGRADE="podman run --rm -t -i --privileged --rm --net=host --ipc=host --pid=host -v /:/host -v /run:/run -e HOST=/host -e IMAGE=\$IMAGE -e NAME=\$NAME -e CONFDIR=/etc -e LOGDIR=/var/log -e DATADIR=/var/lib --entrypoint /bin/sh  \$IMAGE /sbin/upgrade.sh"
+#LABEL UNINSTALL="podman run --rm -t -i --privileged --rm --net=host --ipc=host --pid=host -v /:/host -v /run:/run -e HOST=/host -e IMAGE=\$IMAGE -e NAME=\$NAME -e CONFDIR=/etc -e LOGDIR=/var/log -e DATADIR=/var/lib --entrypoint /bin/sh  \$IMAGE /sbin/uninstall.sh"
 
