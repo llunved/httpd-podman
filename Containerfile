@@ -28,6 +28,7 @@ ADD ./rpmreqs-rt.txt ./rpmreqs-dev.txt /httpd/
 # Create the minimal target environment
 RUN mkdir /sysimg \
     && dnf install --installroot /sysimg --releasever $OS_RELEASE --setopt install_weak_deps=false --nodocs -y coreutils-single glibc-minimal-langpack $(cat rpmreqs-rt.txt) \
+    && if [ "${DEVBUILD}" == "True" ]; then dnf install --installroot /sysimg --releasever $OS_RELEASE --setopt install_weak_deps=false --nodocs -y $(cat rpmreqs-dev.txt); fi \
     && rm -rf /sysimg/var/cache/*
 
 #FIXME this needs to be more elegant
@@ -63,7 +64,7 @@ RUN chmod +x /sbin/install.sh \
   
 # Using FPM
 EXPOSE 80 443
-CMD ["/sbin/init"]
+CMD ["/usr/sbin/init"]
 STOPSIGNAL SIGRTMIN+3
 
 LABEL RUN="podman run --rm -t -i --name ${NAME} --net=host -v /var/lib/${NAME}/www:/var/www:rw,z -v etc/${NAME}:/etc/${NAME}:rw,z -v /var/log/${NAME}:/var/log/${NAME}:rw,z ${IMAGE}"

@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# TODO:
+# - Better handling for config files on explicit upgrade.
+# - Auto update? https://www.redhat.com/sysadmin/improved-systemd-podman
 
 set -x
 
@@ -21,7 +24,7 @@ for CUR_DIR in /host${LOGDIR}/${NAME} /host${DATADIR}/${NAME} /host${CONFDIR}/${
 	    cp -Rv ${CONFDIR}/${NAME}.default/* /host${CONFDIR}/${NAME}/
 	elif [ "$CUR_DIR" == "/host${DATADIR}/${NAME}" ] ; then
             mkdir /host${DATADIR}/${NAME}/www
-	    cp -Rv /var/www.default/* /host${DATADIR}/${NAME}/www
+	    cp -Rv /var/www.default/* /host${DATADIR}/${NAME}/www/
 	fi
         chmod 775 $CUR_DIR
 	chgrp -R 0 $CUR_DIR
