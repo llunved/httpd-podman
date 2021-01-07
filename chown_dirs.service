@@ -1,0 +1,13 @@
+[Unit]
+Description=Chown directories
+Before=httpd.service
+After=init_container.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash -x /sbin/chown_dirs.sh
+RemainAfterExit=true
+StandardOutput=journal
+
+[Install]
+WantedBy=multi-user.target

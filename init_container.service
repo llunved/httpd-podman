@@ -1,0 +1,13 @@
+[Unit]
+Description=Init container at first start
+ConditionPathExists=!/etc/init_done
+Before=httpd.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash -x /sbin/init_container.sh
+RemainAfterExit=true
+StandardOutput=journal
+
+[Install]
+WantedBy=default.target
