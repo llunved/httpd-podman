@@ -10,3 +10,4 @@ mod_ldap
 mod_security_crs 
 mod_xsendfile 
 mod_evasive
+findutils

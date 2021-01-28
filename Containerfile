@@ -6,13 +6,11 @@ FROM $OS_IMAGE as build
 ARG OS_RELEASE
 ARG OS_IMAGE
 ARG HTTP_PROXY=""
-ARG USER="httpd"
-ARG VOLUMES_ARG="/etc/httpd /var/www /usr/share/httpd /var/log/httpd"
 
 LABEL MAINTAINER riek@llunved.net
 
 ENV LANG=C.UTF-8
-ENV VOLUMES=$VOLUMES_ARG
+ENV VOLUMES="/etc/httpd,/var/www,/usr/share/httpd,/var/log/httpd,/var/php-fpm"
 
 USER root
 
@@ -37,10 +35,6 @@ RUN mkdir /sysimg \
 #FIXME this needs to be more elegant
 RUN ln -s /sysimg/usr/share/zoneinfo/America/New_York /sysimg/etc/localtime
 
-# Set up systemd inside the container
-RUN systemctl --root /sysimg mask systemd-remount-fs.service dev-hugepages.mount sys-fs-fuse-connections.mount systemd-logind.service getty.target console-getty.service && systemctl --root /sysimg disable dnf-makecache.timer dnf-makecache.service
-RUN /usr/bin/systemctl --root /sysimg enable httpd
- 
 # Move the httpd config to a deoc dir, so we can mount config from the host but export the defaults from the host
 RUN if [ -d /sysimg/usr/share/doc/httpd ]; then \
        mv /sysimg/usr/share/doc/httpd /sysimg/usr/share/doc/httpd.default ; \
@@ -56,32 +50,46 @@ RUN for CURF in ${VOLUMES} ; do \
     fi ; \
     done
 
+ADD ./install.sh \
+    ./upgrade.sh \
+    ./uninstall.sh \
+    ./chown_dirs.sh \
+    ./init_container.sh /sysimg/sbin
+ 
+RUN chmod +x /sysimg/sbin/install.sh \
+    /sysimg/sbin/upgrade.sh \
+    /sysimg/sbin/uninstall.sh \
+    /sysimg/sbin/chown_dirs.sh \
+    /sysimg/sbin/init_container.sh 
+ 
+# Set up systemd inside the container
+ADD init_container.service \
+    chown_dirs.service \
+    /sysimg/etc/systemd/system
+
+RUN systemctl --root /sysimg mask systemd-remount-fs.service dev-hugepages.mount sys-fs-fuse-connections.mount systemd-logind.service getty.target console-getty.service && systemctl --root /sysimg disable dnf-makecache.timer dnf-makecache.service
+RUN /usr/bin/systemctl --root /sysimg enable httpd.service chown_dirs.service init_container.service
+ 
 
 FROM scratch AS runtime
-
-ARG VOLUMES_ARG="/etc/httpd /var/www /usr/share/httpd /var/log/httpd"
 
 COPY --from=build /sysimg /
 
 WORKDIR /var/lib/httpd
 
-ENV USER=$USER
 ENV CHOWN=true 
-ENV CHOWN_DIRS="/var/www /etc/httpd" 
+ENV CHOWN_DIRS="/var/www,/etc/httpd" 
+ENV CHOWN_USER="apache"
  
-ENV VOLUMES=$VOLUMES_ARG
-VOLUME $VOLUMES
+ENV VOLUMES="/etc/httpd,/var/www,/usr/share/httpd,/var/log/httpd,/var/php-fpm"
 
-ADD ./install.sh \ 
-    ./upgrade.sh \
-    ./uninstall.sh \
-    ./init_container.sh /sbin
+VOLUME /etc/httpd
+VOLUME /var/www
+VOLUME /usr/share/httpd
+VOLUME /var/log/httpd
+VOLUME /var/php-fpm
+
  
-RUN chmod +x /sbin/install.sh \
-             /sbin/upgrade.sh \
-             /sbin/uninstall.sh \
-             /sbin/init_container.sh
-  
 EXPOSE 80 443
 CMD ["/usr/sbin/init"]
 STOPSIGNAL SIGRTMIN+3
