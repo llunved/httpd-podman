@@ -15,8 +15,8 @@ cp -pRuv /usr/share/doc/httpd.default/* /usr/share/doc/httpd/
 # Copy other config files if they are missing or an update is forced.
 for CUR_DIR in $(tr ',' '\n' <<< "${VOLUMES}") ; do \
     if [ -f ${CUR_DIR}/.forceinit ] || [ ! "$(ls -A ${CUR_DIR}/)" ]; then
-        if [ -d /usr/share/doc/http.default/config${CUR_DIR} ]; then
-            cp -pRv /usr/share/doc/http.default/config${CUR_DIR}/* ${CUR_DIR}/
+        if [ -d /usr/share/doc/httpd.default/config${CUR_DIR} ]; then
+            cp -pRv /usr/share/doc/httpd.default/config${CUR_DIR}/* ${CUR_DIR}/
         fi
     fi
 done
